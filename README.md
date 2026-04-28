@@ -106,6 +106,14 @@ npx @builtbyecho/add-ci . --skip-install
 npx @builtbyecho/add-ci . --force
 ```
 
+## Feedback & Issues
+
+Found a bug? Have a feature request?
+
+- **[Open an issue](https://github.com/BuiltByEcho/add-ci/issues/new)** — bug reports, feature requests, questions
+- **[Discussions](https://github.com/BuiltByEcho/add-ci/discussions)** — ideas, Q&A, show & tell
+- **[Discord](https://discord.com/invite/clawd)** — community chat
+
 ## License
 
 MIT
