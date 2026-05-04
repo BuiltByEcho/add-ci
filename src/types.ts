@@ -11,6 +11,7 @@ export interface Options {
   skipVercel: boolean;
   skipInstall: boolean;
   force: boolean;
+  dryRun: boolean;
 }
 
 export interface Detected {

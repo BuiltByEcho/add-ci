@@ -28,7 +28,20 @@ npx @builtbyecho/add-ci . --backend supabase --framework nextjs --tier 3
 
 # Auto-detect everything, tier 2
 npx @builtbyecho/add-ci . --tier 2
+
+# Preview without touching the project
+npx @builtbyecho/add-ci . --tier 2 --dry-run
 ```
+
+## Dry Run Mode
+
+Use `--dry-run` before letting an agent modify a repository. It performs the same package/framework/backend detection as a real run, then prints:
+
+- the files that would be created or overwritten
+- the Playwright/wait-on install command for the detected package manager
+- the reminder to rerun without `--dry-run` when the plan looks right
+
+No directories are created, no files are written, and no dependencies are installed. This makes `add-ci` safer to use inside coding-agent handoffs and CI-planning conversations.
 
 ## Options
 
@@ -39,6 +52,7 @@ npx @builtbyecho/add-ci . --tier 2
 | `--tier` | `2` | Max tier: `1` (lint+type), `2` (+smoke), `3` (+e2e) |
 | `--skip-vercel` | off | Skip Vercel preview integration |
 | `--skip-install` | off | Skip npm/pnpm install step |
+| `--dry-run` | off | Preview detected stack, planned files, and install commands without writing anything |
 | `--force` | off | Overwrite existing workflow/test files |
 
 ## Auto-Detection

@@ -92,6 +92,43 @@ export async function runAddCi(opts: Options): Promise<void> {
     devPort,
   };
 
+  const plannedFiles: string[] = [
+    ".github/workflows/ci.yml",
+    "playwright.config.ts",
+    ".env.example",
+  ];
+  if (opts.tier >= 2) {
+    plannedFiles.push(
+      "tests/smoke/home.spec.ts",
+      "tests/smoke/auth-redirect.spec.ts"
+    );
+  }
+  if (opts.tier >= 3) {
+    plannedFiles.push(
+      ".github/workflows/e2e-nightly.yml",
+      "tests/e2e/auth.spec.ts",
+      "tests/e2e/crud.spec.ts"
+    );
+  }
+
+  if (opts.dryRun) {
+    log(
+      "   🧪 Dry run: no files will be written and dependencies will not be installed."
+    );
+    log("");
+    log("Would create/update:");
+    for (const file of plannedFiles) log(`  ${file}`);
+    log("");
+    log("Would install:");
+    log(
+      `  ${pkgCommands(detected.pkgManager).addDev} @playwright/test wait-on`
+    );
+    log("  npx playwright install chromium");
+    log("");
+    log("Run again without --dry-run to apply these changes.");
+    return;
+  }
+
   // Create directories
   mkdirSync(resolve(projectDir, ".github/workflows"), { recursive: true });
   mkdirSync(resolve(projectDir, "tests/smoke"), { recursive: true });

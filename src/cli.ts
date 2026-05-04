@@ -19,6 +19,7 @@ Options:
   --tier <level>      CI tier: 1 (lint+type), 2 (+smoke), 3 (+e2e) (default: 2)
   --skip-vercel       Skip Vercel integration
   --skip-install      Skip dependency installation
+  --dry-run           Print the planned files without writing or installing anything
   --force             Overwrite existing files
   -h, --help          Show this help message
 
@@ -37,6 +38,7 @@ function main() {
       tier: { type: "string" },
       "skip-vercel": { type: "boolean" },
       "skip-install": { type: "boolean" },
+      "dry-run": { type: "boolean" },
       force: { type: "boolean" },
       help: { type: "boolean", short: "h" },
     },
@@ -86,6 +88,7 @@ function main() {
 
   if (values["skip-vercel"]) partial.skipVercel = true;
   if (values["skip-install"]) partial.skipInstall = true;
+  if (values["dry-run"]) partial.dryRun = true;
   if (values.force) partial.force = true;
 
   // If all required options are provided, run directly (no prompts)
