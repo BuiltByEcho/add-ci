@@ -131,3 +131,7 @@ Found a bug? Have a feature request?
 ## License
 
 MIT
+
+## Agent Skill
+
+This package includes an OpenClaw/Claude-style skill at `skills/ci-pipeline` that teaches agents to inspect, plan, and scaffold CI safely. Prefer `--dry-run` before writing files.
