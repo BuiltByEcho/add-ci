@@ -1,6 +1,6 @@
 # @builtbyecho/add-ci
 
-Scaffold CI/CD pipelines for web projects. Zero-config auto-detection, opinionated defaults, and production-tested templates — not theory.
+Scaffold CI/CD pipelines for web and Node package projects. Zero-config auto-detection, opinionated defaults, and production-tested templates — not theory.
 
 ```bash
 npx @builtbyecho/add-ci
@@ -8,11 +8,11 @@ npx @builtbyecho/add-ci
 
 ## What It Does
 
-Adds GitHub Actions workflows + Playwright test templates to any web project:
+Adds GitHub Actions workflows to web apps and Node packages. For Next.js/Vite web apps it can add Playwright test templates; for generic Node packages it uses your existing package scripts without dragging in browser-test dependencies:
 
 - **Tier 1 — Fast Gate** (~30s, every PR): ESLint + TypeScript type-check
 - **Tier 2 — Smoke Tests** (~2min, every PR): Playwright browser smoke tests
-- **Tier 3 — E2E Flows** (~10min, nightly): Full user journeys on schedule
+- **Tier 3 — E2E Flows / Pack Smoke**: Full web user journeys on schedule, or `npm pack --dry-run` for Node packages
 
 ## Quick Start
 
@@ -31,6 +31,9 @@ npx @builtbyecho/add-ci . --tier 2
 
 # Preview without touching the project
 npx @builtbyecho/add-ci . --tier 2 --dry-run
+
+# Node/CLI/package project: workflow only, no Playwright files or installs
+npx @builtbyecho/add-ci . --framework generic --backend none --tier 3
 ```
 
 ## Dry Run Mode
@@ -38,7 +41,7 @@ npx @builtbyecho/add-ci . --tier 2 --dry-run
 Use `--dry-run` before letting an agent modify a repository. It performs the same package/framework/backend detection as a real run, then prints:
 
 - the files that would be created or overwritten
-- the Playwright/wait-on install command for the detected package manager
+- the Playwright/wait-on install command for web apps, or “nothing” for generic Node packages
 - the reminder to rerun without `--dry-run` when the plan looks right
 
 No directories are created, no files are written, and no dependencies are installed. This makes `add-ci` safer to use inside coding-agent handoffs and CI-planning conversations.
@@ -48,7 +51,7 @@ No directories are created, no files are written, and no dependencies are instal
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--backend` | `auto` | `supabase`, `mongodb`, `none`, or `auto` (detects from deps) |
-| `--framework` | `auto` | `nextjs`, `vite`, or `auto` (detects from package.json) |
+| `--framework` | `auto` | `nextjs`, `vite`, `generic`, or `auto` (detects from package.json) |
 | `--tier` | `2` | Max tier: `1` (lint+type), `2` (+smoke), `3` (+e2e) |
 | `--skip-vercel` | off | Skip Vercel preview integration |
 | `--skip-install` | off | Skip npm/pnpm install step |
@@ -63,6 +66,7 @@ When `--backend` or `--framework` is `auto` (the default), the CLI reads your `p
 - **Vite**: detected by `vite` dependency
 - **Supabase**: detected by `@supabase/supabase-js` or `@supabase/ssr`
 - **MongoDB**: detected by `mongoose` or `mongodb`
+- **Generic Node package**: default when no Next.js/Vite dependency is found
 - **Package manager**: pnpm/yarn/npm by lockfile or `packageManager` field
 - **Monorepo**: detected by `turbo.json`, `pnpm-workspace.yaml`, or `lerna.json`
 
@@ -84,6 +88,17 @@ project/
 ├── playwright.config.ts
 └── .env.example
 ```
+
+
+### Generic Node/package projects
+
+When `--framework generic` is selected (or auto-detected because no Next.js/Vite dependency exists), `add-ci` creates only `.github/workflows/ci.yml`. It does **not** create Playwright config/tests, `.env.example`, or install browser-test dependencies. The workflow runs scripts that already exist in `package.json`:
+
+- Tier 1: `typecheck`, `lint`, `build` when present
+- Tier 2: adds `test` when present
+- Tier 3: adds `npm pack --dry-run` as a package publish smoke test
+
+This is meant for CLIs, SDKs, libraries, and small agent tools.
 
 ## Backend-Specific Env Vars
 
@@ -109,6 +124,9 @@ Works with pnpm workspaces + Turborepo. The generated workflows use `--filter` f
 ```bash
 # Add basic lint+type CI to a Vite project
 npx @builtbyecho/add-ci . --framework vite --tier 1
+
+# Add package CI to a Node CLI/library without Playwright
+npx @builtbyecho/add-ci . --framework generic --backend none --tier 3
 
 # Full pipeline for Next.js + Supabase
 npx @builtbyecho/add-ci . --backend supabase --tier 3

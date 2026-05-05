@@ -1,4 +1,4 @@
-import type { Backend, Detected, PkgManager, Tier } from "./types.js";
+import type { Backend, Framework, PkgManager, Tier } from "./types.js";
 import { pkgCommands } from "./detect.js";
 
 interface WorkflowCtx {
@@ -8,6 +8,8 @@ interface WorkflowCtx {
   isMonorepo: boolean;
   devCmd: string;
   devPort: number;
+  framework: Framework;
+  scripts: Record<string, string>;
 }
 
 function pnpmSetup(indent: string = "      "): string {
@@ -29,7 +31,63 @@ function installStep(ctx: WorkflowCtx, indent: string = "      "): string {
   return `${indent}- run: ${cmds.install}\n`;
 }
 
+function runScriptStep(ctx: WorkflowCtx, script: string, label?: string): string | undefined {
+  if (!ctx.scripts[script]) return undefined;
+  const cmds = pkgCommands(ctx.pkg);
+  const name = label ? `      - name: ${label}\n        run: ${cmds.run} ${script}` : `      - run: ${cmds.run} ${script}`;
+  return name;
+}
+
+function generateNodePackageCiYml(ctx: WorkflowCtx): string {
+  const lines: string[] = [];
+  lines.push("name: CI");
+  lines.push("");
+  lines.push("on:");
+  lines.push("  pull_request:");
+  lines.push("    branches: [main]");
+  lines.push("  push:");
+  lines.push("    branches: [main]");
+  lines.push("");
+  lines.push("env:");
+  lines.push("  NODE_VERSION: '24'");
+  lines.push("");
+  lines.push("jobs:");
+  lines.push("  package-checks:");
+  lines.push("    name: Node Package Checks");
+  lines.push("    runs-on: ubuntu-latest");
+  lines.push("    steps:");
+  lines.push("      - uses: actions/checkout@v4");
+  lines.push(...nodeSetup(ctx).trimEnd().split("\n"));
+  lines.push(...installStep(ctx).trimEnd().split("\n"));
+
+  const tierOneScripts = [
+    runScriptStep(ctx, "typecheck", "Type check"),
+    runScriptStep(ctx, "lint", "Lint"),
+    runScriptStep(ctx, "build", "Build"),
+  ].filter(Boolean) as string[];
+
+  if (tierOneScripts.length === 0 && ctx.tier === 1) {
+    lines.push("      - run: npm pkg get name");
+  } else {
+    for (const step of tierOneScripts) lines.push(...step.split("\n"));
+  }
+
+  if (ctx.tier >= 2) {
+    const testStep = runScriptStep(ctx, "test", "Test");
+    if (testStep) lines.push(...testStep.split("\n"));
+  }
+
+  if (ctx.tier >= 3) {
+    lines.push("      - name: Pack smoke test");
+    lines.push("        run: npm pack --dry-run");
+  }
+
+  return lines.join("\n") + "\n";
+}
+
 export function generateCiYml(ctx: WorkflowCtx): string {
+  if (ctx.framework === "generic") return generateNodePackageCiYml(ctx);
+
   const cmds = pkgCommands(ctx.pkg);
   const lines: string[] = [];
 

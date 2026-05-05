@@ -5,7 +5,7 @@ description: Scaffold and manage CI/CD pipelines for web projects. Use when addi
 
 # CI Pipeline Skill
 
-Scaffold production CI/CD pipelines for web projects. Tested templates, not theory.
+Scaffold production CI/CD pipelines for web projects and generic Node packages. Tested templates, not theory.
 
 ## Quick Start
 
@@ -64,7 +64,7 @@ project/
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--backend` | `auto` | `supabase`, `mongodb`, `none`, or `auto` (detects from deps) |
-| `--framework` | `auto` | `nextjs`, `vite`, or `auto` (detects from package.json) |
+| `--framework` | `auto` | `nextjs`, `vite`, `generic`, or `auto` (detects from package.json) |
 | `--tier` | `2` | Max tier to set up (1=lint+type, 2=+smoke, 3=+e2e) |
 | `--skip-vercel` | false | Skip Vercel preview integration |
 | `--skip-install` | false | Skip npm install (use if adding to monorepo) |
@@ -83,16 +83,22 @@ project/
 - No Atlas CI integration (tests run against in-memory Mongo)
 - Env vars: `MONGODB_URI` (auto-set by Memory Server in CI)
 
+### Generic Node/package projects
+- Use `--framework generic --backend none` for CLIs, SDKs, libraries, and small agent tools.
+- Creates only `.github/workflows/ci.yml`; no Playwright config/tests, `.env.example`, or browser-test dependency installs.
+- Runs existing package scripts: Tier 1 uses `typecheck`, `lint`, `build`; Tier 2 adds `test`; Tier 3 adds `npm pack --dry-run`.
+
 ### No Backend
 - Skip database tests
-- Only run lint + typecheck + Playwright smoke
+- For web apps, run lint + typecheck + Playwright smoke
+- For generic Node packages, run package script checks only
 
 ## How It Works
 
 1. **Detect** project type (framework, backend, existing config)
 2. **Validate** preconditions (git repo, package.json, Vercel link)
 3. **Generate** workflow files and test specs from templates
-4. **Install** Playwright + dependencies
+4. **Install** Playwright + dependencies for web apps only; generic Node/package mode installs nothing
 5. **Wire** Vercel preview → wait → test flow
 6. **Report** what was added and what secrets need setting
 
@@ -110,7 +116,8 @@ Implemented via `vercel wait` in CI or the Vercel GitHub integration's `vercel-d
 ## Important Constraints
 
 - **Never commit secrets** — all env vars in GitHub Secrets or Vercel env
-- **Playwright browsers** — cached in CI via `actions/cache`
+- **Playwright browsers** — cached in CI via `actions/cache` for web app modes
+- **Generic mode** — no browser files or dependencies; use when the target is not a web app
 - **Monorepo support** — use `--filter` for turborepo workspaces
 - **Skip if exists** — never overwrite existing workflow or config files without `--force`
 

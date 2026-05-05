@@ -90,25 +90,27 @@ export async function runAddCi(opts: Options): Promise<void> {
     isMonorepo: detected.isMonorepo,
     devCmd,
     devPort,
+    framework: detected.framework,
+    scripts: detected.scripts,
   };
 
-  const plannedFiles: string[] = [
-    ".github/workflows/ci.yml",
-    "playwright.config.ts",
-    ".env.example",
-  ];
-  if (opts.tier >= 2) {
-    plannedFiles.push(
-      "tests/smoke/home.spec.ts",
-      "tests/smoke/auth-redirect.spec.ts"
-    );
-  }
-  if (opts.tier >= 3) {
-    plannedFiles.push(
-      ".github/workflows/e2e-nightly.yml",
-      "tests/e2e/auth.spec.ts",
-      "tests/e2e/crud.spec.ts"
-    );
+  const isGenericNode = detected.framework === "generic";
+  const plannedFiles: string[] = [".github/workflows/ci.yml"];
+  if (!isGenericNode) {
+    plannedFiles.push("playwright.config.ts", ".env.example");
+    if (opts.tier >= 2) {
+      plannedFiles.push(
+        "tests/smoke/home.spec.ts",
+        "tests/smoke/auth-redirect.spec.ts"
+      );
+    }
+    if (!isGenericNode && opts.tier >= 3) {
+      plannedFiles.push(
+        ".github/workflows/e2e-nightly.yml",
+        "tests/e2e/auth.spec.ts",
+        "tests/e2e/crud.spec.ts"
+      );
+    }
   }
 
   if (opts.dryRun) {
@@ -119,11 +121,15 @@ export async function runAddCi(opts: Options): Promise<void> {
     log("Would create/update:");
     for (const file of plannedFiles) log(`  ${file}`);
     log("");
-    log("Would install:");
-    log(
-      `  ${pkgCommands(detected.pkgManager).addDev} @playwright/test wait-on`
-    );
-    log("  npx playwright install chromium");
+    if (isGenericNode) {
+      log("Would install: nothing (generic Node/package CI uses existing package scripts).");
+    } else {
+      log("Would install:");
+      log(
+        `  ${pkgCommands(detected.pkgManager).addDev} @playwright/test wait-on`
+      );
+      log("  npx playwright install chromium");
+    }
     log("");
     log("Run again without --dry-run to apply these changes.");
     return;
@@ -131,8 +137,10 @@ export async function runAddCi(opts: Options): Promise<void> {
 
   // Create directories
   mkdirSync(resolve(projectDir, ".github/workflows"), { recursive: true });
-  mkdirSync(resolve(projectDir, "tests/smoke"), { recursive: true });
-  mkdirSync(resolve(projectDir, "tests/e2e"), { recursive: true });
+  if (!isGenericNode) {
+    mkdirSync(resolve(projectDir, "tests/smoke"), { recursive: true });
+    mkdirSync(resolve(projectDir, "tests/e2e"), { recursive: true });
+  }
 
   // Generate CI workflow
   const ciYml = generateCiYml(ctx);
@@ -142,7 +150,7 @@ export async function runAddCi(opts: Options): Promise<void> {
   }
 
   // Generate E2E nightly workflow (Tier 3)
-  if (opts.tier >= 3) {
+  if (!isGenericNode && opts.tier >= 3) {
     const e2eYml = generateE2eNightlyYml(ctx);
     const e2ePath = resolve(projectDir, ".github/workflows/e2e-nightly.yml");
     if (writeFileIfNotExists(e2ePath, e2eYml, opts.force)) {
@@ -151,14 +159,16 @@ export async function runAddCi(opts: Options): Promise<void> {
   }
 
   // Generate Playwright config
-  const pwConfig = generatePlaywrightConfig(devCmd, devPort);
-  const pwPath = resolve(projectDir, "playwright.config.ts");
-  if (writeFileIfNotExists(pwPath, pwConfig, opts.force)) {
-    log(`   ✅ Created playwright.config.ts`);
+  if (!isGenericNode) {
+    const pwConfig = generatePlaywrightConfig(devCmd, devPort);
+    const pwPath = resolve(projectDir, "playwright.config.ts");
+    if (writeFileIfNotExists(pwPath, pwConfig, opts.force)) {
+      log(`   ✅ Created playwright.config.ts`);
+    }
   }
 
   // Generate smoke test specs (Tier 2+)
-  if (opts.tier >= 2) {
+  if (!isGenericNode && opts.tier >= 2) {
     const smokeHomePath = resolve(projectDir, "tests/smoke/home.spec.ts");
     if (writeFileIfNotExists(smokeHomePath, generateSmokeHome(), opts.force)) {
       log(`   ✅ Created tests/smoke/home.spec.ts`);
@@ -180,7 +190,7 @@ export async function runAddCi(opts: Options): Promise<void> {
   }
 
   // Generate E2E test specs (Tier 3)
-  if (opts.tier >= 3) {
+  if (!isGenericNode && opts.tier >= 3) {
     const e2eAuthPath = resolve(projectDir, "tests/e2e/auth.spec.ts");
     if (writeFileIfNotExists(e2eAuthPath, generateE2eAuth(), opts.force)) {
       log(`   ✅ Created tests/e2e/auth.spec.ts`);
@@ -193,14 +203,16 @@ export async function runAddCi(opts: Options): Promise<void> {
   }
 
   // Generate .env.example
-  const envExamplePath = resolve(projectDir, ".env.example");
-  const envContent = generateEnvExample(detected.backend);
-  if (writeFileIfNotExists(envExamplePath, envContent, opts.force)) {
-    log(`   ✅ Created .env.example`);
+  if (!isGenericNode) {
+    const envExamplePath = resolve(projectDir, ".env.example");
+    const envContent = generateEnvExample(detected.backend);
+    if (writeFileIfNotExists(envExamplePath, envContent, opts.force)) {
+      log(`   ✅ Created .env.example`);
+    }
   }
 
   // Install dependencies
-  if (!opts.skipInstall) {
+  if (!opts.skipInstall && !isGenericNode) {
     log("   📦 Installing Playwright + wait-on...");
     const cmds = pkgCommands(detected.pkgManager);
     try {
@@ -225,15 +237,21 @@ export async function runAddCi(opts: Options): Promise<void> {
   log(`✅ CI pipeline added to ${detected.projectName}!`);
   log("");
   log("Files created:");
-  log(`  .github/workflows/ci.yml          — Tier 1${opts.tier >= 2 ? "+2" : ""} on PR`);
-  if (opts.tier >= 3) {
+  if (isGenericNode) {
+    log("  .github/workflows/ci.yml          — Node package checks on PR/push");
+  } else {
+    log(`  .github/workflows/ci.yml          — Tier 1${opts.tier >= 2 ? "+2" : ""} on PR`);
+  }
+  if (!isGenericNode && opts.tier >= 3) {
     log("  .github/workflows/e2e-nightly.yml  — Tier 3 nightly E2E");
   }
-  log("  playwright.config.ts              — Playwright configuration");
-  if (opts.tier >= 2) {
+  if (!isGenericNode) {
+    log("  playwright.config.ts              — Playwright configuration");
+  }
+  if (!isGenericNode && opts.tier >= 2) {
     log("  tests/smoke/                      — Smoke test specs");
   }
-  if (opts.tier >= 3) {
+  if (!isGenericNode && opts.tier >= 3) {
     log("  tests/e2e/                        — E2E test specs");
   }
   if (detected.pkgManager !== "npm") {
@@ -244,11 +262,16 @@ export async function runAddCi(opts: Options): Promise<void> {
   }
   log("");
   log("Next steps:");
-  log("  1. Set up GitHub Secrets (see .env.example)");
-  log("  2. Commit and push to trigger first CI run");
-  log("  3. Add data-testid attributes to your components");
-  if (!opts.skipVercel) {
-    log("  4. Link Vercel project: vercel link");
+  if (isGenericNode) {
+    log("  1. Commit and push to trigger first CI run");
+    log("  2. Add missing lint/typecheck/test scripts if you want stricter checks");
+  } else {
+    log("  1. Set up GitHub Secrets (see .env.example)");
+    log("  2. Commit and push to trigger first CI run");
+    log("  3. Add data-testid attributes to your components");
+    if (!opts.skipVercel) {
+      log("  4. Link Vercel project: vercel link");
+    }
   }
   log("");
 }

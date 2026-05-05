@@ -20,4 +20,5 @@ export interface Detected {
   pkgManager: PkgManager;
   isMonorepo: boolean;
   projectName: string;
+  scripts: Record<string, string>;
 }

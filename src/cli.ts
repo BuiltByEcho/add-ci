@@ -15,7 +15,7 @@ Arguments:
 
 Options:
   --backend <type>    Backend: supabase, mongodb, none, auto (default: auto)
-  --framework <type>  Framework: nextjs, vite, auto (default: auto)
+  --framework <type>  Framework: nextjs, vite, generic, auto (default: auto)
   --tier <level>      CI tier: 1 (lint+type), 2 (+smoke), 3 (+e2e) (default: 2)
   --skip-vercel       Skip Vercel integration
   --skip-install      Skip dependency installation
@@ -27,7 +27,7 @@ Examples:
   npx @builtbyecho/add-ci                           # Interactive prompts
   npx @builtbyecho/add-ci ./my-app                  # Target specific project
   npx @builtbyecho/add-ci . --backend supabase      # Explicit backend
-  npx @builtbyecho/add-ci . --framework nextjs --tier 3  # Full CI pipeline
+  npx @builtbyecho/add-ci . --framework generic --tier 3 # Node package CI
 `;
 
 function main() {

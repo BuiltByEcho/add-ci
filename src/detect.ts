@@ -7,6 +7,7 @@ interface PackageJson {
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
   packageManager?: string;
+  scripts?: Record<string, string>;
 }
 
 function readPackageJson(dir: string): PackageJson {
@@ -64,12 +65,14 @@ export function getProjectName(dir: string): string {
 }
 
 export function detect(dir: string, opts: { framework: Framework; backend: Backend }): Detected {
+  const pkg = readPackageJson(dir);
   return {
     framework: detectFramework(dir, opts.framework),
     backend: detectBackend(dir, opts.backend),
     pkgManager: detectPkgManager(dir),
     isMonorepo: detectMonorepo(dir),
-    projectName: getProjectName(dir),
+    projectName: pkg.name || dir.split("/").pop() || "unknown",
+    scripts: pkg.scripts || {},
   };
 }
 
