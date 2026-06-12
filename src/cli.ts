@@ -20,6 +20,7 @@ Options:
   --skip-vercel       Skip Vercel integration
   --skip-install      Skip dependency installation
   --dry-run           Print the planned files without writing or installing anything
+  --json              Print machine-readable plan output
   --force             Overwrite existing files
   -h, --help          Show this help message
 
@@ -28,6 +29,7 @@ Examples:
   npx @builtbyecho/add-ci ./my-app                  # Target specific project
   npx @builtbyecho/add-ci . --backend supabase      # Explicit backend
   npx @builtbyecho/add-ci . --framework generic --tier 3 # Node package CI
+  npx @builtbyecho/add-ci . --dry-run --json        # Agent-readable plan
 `;
 
 function main() {
@@ -39,6 +41,7 @@ function main() {
       "skip-vercel": { type: "boolean" },
       "skip-install": { type: "boolean" },
       "dry-run": { type: "boolean" },
+      json: { type: "boolean" },
       force: { type: "boolean" },
       help: { type: "boolean", short: "h" },
     },
@@ -89,6 +92,7 @@ function main() {
   if (values["skip-vercel"]) partial.skipVercel = true;
   if (values["skip-install"]) partial.skipInstall = true;
   if (values["dry-run"]) partial.dryRun = true;
+  if (values.json) partial.json = true;
   if (values.force) partial.force = true;
 
   // If all required options are provided, run directly (no prompts)

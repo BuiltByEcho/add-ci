@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, existsSync, readFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -83,4 +83,40 @@ test('generic dry-run plans only workflow and no installs', () => {
   assert.match(res.stdout, /\.github\/workflows\/ci\.yml/);
   assert.doesNotMatch(res.stdout, /playwright\.config\.ts|@playwright\/test|wait-on/);
   assert.equal(existsSync(join(dir, '.github')), false);
+});
+
+test('--dry-run --json prints a machine-readable plan without writing files', () => {
+  const dir = makeNodePackage();
+  const res = run([dir, '--backend', 'none', '--framework', 'generic', '--tier', '3', '--dry-run', '--json']);
+  assert.equal(res.status, 0, res.stderr);
+  assert.equal(res.stderr, '');
+  const parsed = JSON.parse(res.stdout);
+  assert.equal(parsed.mode, 'dry-run');
+  assert.equal(parsed.plan.projectName, 'fixture-cli');
+  assert.equal(parsed.plan.detected.framework, 'generic');
+  assert.equal(parsed.plan.tier, 3);
+  assert.deepEqual(parsed.plan.installs, []);
+  assert.deepEqual(parsed.plan.files.map((file) => file.path), ['.github/workflows/ci.yml']);
+  assert.equal(parsed.plan.files[0].action, 'create');
+  assert.match(parsed.plan.notes.join('\n'), /generic Node\/package CI uses existing package scripts/);
+  assert.equal(existsSync(join(dir, '.github')), false);
+});
+
+test('--dry-run --json marks existing files as skipped unless forced', () => {
+  const dir = makeNodePackage();
+  const githubDir = join(dir, '.github/workflows');
+  const workflowPath = join(githubDir, 'ci.yml');
+  mkdirSync(githubDir, { recursive: true });
+  writeFileSync(workflowPath, 'name: Existing\n');
+
+  const res = run([dir, '--backend', 'none', '--framework', 'generic', '--tier', '1', '--dry-run', '--json']);
+  assert.equal(res.status, 0, res.stderr);
+  const parsed = JSON.parse(res.stdout);
+  assert.equal(parsed.plan.files[0].action, 'skip');
+  assert.match(parsed.plan.files[0].reason, /use --force/);
+
+  const forced = run([dir, '--backend', 'none', '--framework', 'generic', '--tier', '1', '--dry-run', '--json', '--force']);
+  assert.equal(forced.status, 0, forced.stderr);
+  const forcedParsed = JSON.parse(forced.stdout);
+  assert.equal(forcedParsed.plan.files[0].action, 'overwrite');
 });

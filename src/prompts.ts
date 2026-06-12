@@ -103,5 +103,6 @@ export async function promptForOptions(partial: Partial<Options>): Promise<Optio
     skipInstall: partial.skipInstall ?? responses.skipInstall ?? false,
     force: partial.force ?? false,
     dryRun: partial.dryRun ?? false,
+    json: partial.json ?? false,
   };
 }

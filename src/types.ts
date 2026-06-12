@@ -12,6 +12,29 @@ export interface Options {
   skipInstall: boolean;
   force: boolean;
   dryRun: boolean;
+  json: boolean;
+}
+
+export interface PlannedFile {
+  path: string;
+  kind: "workflow" | "config" | "env" | "test";
+  action: "create" | "overwrite" | "skip";
+  reason?: string;
+}
+
+export interface AddCiPlan {
+  projectDir: string;
+  projectName: string;
+  detected: Detected;
+  tier: Tier;
+  devServer?: {
+    command: string;
+    port: number;
+  };
+  files: PlannedFile[];
+  installs: string[];
+  notes: string[];
+  nextSteps: string[];
 }
 
 export interface Detected {

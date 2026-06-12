@@ -68,6 +68,18 @@ project/
 | `--tier` | `2` | Max tier to set up (1=lint+type, 2=+smoke, 3=+e2e) |
 | `--skip-vercel` | false | Skip Vercel preview integration |
 | `--skip-install` | false | Skip npm install (use if adding to monorepo) |
+| `--dry-run` | false | Preview detected stack, planned files, and install commands without writing anything |
+| `--json` | false | Emit a structured plan for agents/automation |
+
+## Agent planning mode
+
+Before writing files in an unfamiliar repository, prefer:
+
+```bash
+npx @builtbyecho/add-ci /path/to/project --dry-run --json
+```
+
+Read the JSON plan first. Check `detected`, `files`, `installs`, and `notes`; only rerun without `--dry-run` when the plan fits the target repo. Existing files are marked as `skip` unless `--force` is supplied.
 
 ## Backend-Specific Notes
 

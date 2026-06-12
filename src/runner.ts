@@ -6,7 +6,7 @@ import {
   appendFileSync,
 } from "fs";
 import { execSync } from "child_process";
-import type { Options, Detected, Tier } from "./types.js";
+import type { AddCiPlan, Options, Detected, PlannedFile } from "./types.js";
 import { detect, pkgCommands } from "./detect.js";
 import {
   generateCiYml,
@@ -18,10 +18,6 @@ import {
   generateE2eCrud,
   generateEnvExample,
 } from "./generate.js";
-
-function log(msg: string) {
-  console.log(msg);
-}
 
 function getDevCmd(detected: Detected): { cmd: string; port: number } {
   const cmds = pkgCommands(detected.pkgManager);
@@ -41,6 +37,80 @@ function getDevCmd(detected: Detected): { cmd: string; port: number } {
   }
 }
 
+function buildFilePlan(projectDir: string, isGenericNode: boolean, tier: number, force: boolean): PlannedFile[] {
+  const paths: Array<{ path: string; kind: PlannedFile["kind"] }> = [
+    { path: ".github/workflows/ci.yml", kind: "workflow" },
+  ];
+
+  if (!isGenericNode) {
+    paths.push(
+      { path: "playwright.config.ts", kind: "config" },
+      { path: ".env.example", kind: "env" }
+    );
+    if (tier >= 2) {
+      paths.push(
+        { path: "tests/smoke/home.spec.ts", kind: "test" },
+        { path: "tests/smoke/auth-redirect.spec.ts", kind: "test" }
+      );
+    }
+    if (tier >= 3) {
+      paths.push(
+        { path: ".github/workflows/e2e-nightly.yml", kind: "workflow" },
+        { path: "tests/e2e/auth.spec.ts", kind: "test" },
+        { path: "tests/e2e/crud.spec.ts", kind: "test" }
+      );
+    }
+  }
+
+  return paths.map((file) => {
+    const exists = existsSync(resolve(projectDir, file.path));
+    if (!exists) return { ...file, action: "create" };
+    if (force) return { ...file, action: "overwrite", reason: "--force enabled" };
+    return { ...file, action: "skip", reason: "file exists; use --force to overwrite" };
+  });
+}
+
+function buildPlan(projectDir: string, detected: Detected, opts: Options): AddCiPlan {
+  const { cmd: devCmd, port: devPort } = getDevCmd(detected);
+  const isGenericNode = detected.framework === "generic";
+  const installCommands = isGenericNode
+    ? []
+    : [
+        `${pkgCommands(detected.pkgManager).addDev} @playwright/test wait-on`,
+        "npx playwright install chromium",
+      ];
+
+  const notes = [
+    isGenericNode
+      ? "generic Node/package CI uses existing package scripts and installs no browser-test dependencies"
+      : "web app CI adds Playwright smoke coverage and browser dependencies",
+  ];
+  if (detected.isMonorepo) notes.push("monorepo detected");
+
+  const nextSteps = isGenericNode
+    ? [
+        "Commit and push to trigger the first CI run.",
+        "Add missing lint/typecheck/test scripts if you want stricter checks.",
+      ]
+    : [
+        "Set required GitHub Secrets before the first CI run.",
+        "Commit and push to trigger the first CI run.",
+        "Add data-testid attributes to flows covered by generated tests.",
+      ];
+
+  return {
+    projectDir,
+    projectName: detected.projectName,
+    detected,
+    tier: opts.tier,
+    devServer: isGenericNode ? undefined : { command: devCmd, port: devPort },
+    files: buildFilePlan(projectDir, isGenericNode, opts.tier, opts.force),
+    installs: opts.skipInstall ? [] : installCommands,
+    notes,
+    nextSteps,
+  };
+}
+
 function writeFileIfNotExists(
   filePath: string,
   content: string,
@@ -57,6 +127,9 @@ function writeFileIfNotExists(
 
 export async function runAddCi(opts: Options): Promise<void> {
   const projectDir = resolve(opts.path);
+  const log = (msg: string) => {
+    if (!opts.json) console.log(msg);
+  };
 
   if (!existsSync(projectDir)) {
     throw new Error(`Directory ${projectDir} does not exist`);
@@ -73,6 +146,7 @@ export async function runAddCi(opts: Options): Promise<void> {
   });
 
   const { cmd: devCmd, port: devPort } = getDevCmd(detected);
+  const plan = buildPlan(projectDir, detected, opts);
 
   log("");
   log(`🔧 Adding CI pipeline to ${detected.projectName}`);
@@ -95,40 +169,30 @@ export async function runAddCi(opts: Options): Promise<void> {
   };
 
   const isGenericNode = detected.framework === "generic";
-  const plannedFiles: string[] = [".github/workflows/ci.yml"];
-  if (!isGenericNode) {
-    plannedFiles.push("playwright.config.ts", ".env.example");
-    if (opts.tier >= 2) {
-      plannedFiles.push(
-        "tests/smoke/home.spec.ts",
-        "tests/smoke/auth-redirect.spec.ts"
-      );
-    }
-    if (!isGenericNode && opts.tier >= 3) {
-      plannedFiles.push(
-        ".github/workflows/e2e-nightly.yml",
-        "tests/e2e/auth.spec.ts",
-        "tests/e2e/crud.spec.ts"
-      );
-    }
-  }
 
   if (opts.dryRun) {
+    if (opts.json) {
+      console.log(JSON.stringify({ mode: "dry-run", plan }, null, 2));
+      return;
+    }
     log(
       "   🧪 Dry run: no files will be written and dependencies will not be installed."
     );
     log("");
     log("Would create/update:");
-    for (const file of plannedFiles) log(`  ${file}`);
+    for (const file of plan.files) {
+      const suffix = file.action === "skip" ? ` (${file.reason})` : "";
+      log(`  ${file.path}${suffix}`);
+    }
     log("");
-    if (isGenericNode) {
-      log("Would install: nothing (generic Node/package CI uses existing package scripts).");
-    } else {
+    if (plan.installs.length) {
       log("Would install:");
-      log(
-        `  ${pkgCommands(detected.pkgManager).addDev} @playwright/test wait-on`
-      );
-      log("  npx playwright install chromium");
+      for (const command of plan.installs) log(`  ${command}`);
+    } else {
+      const reason = isGenericNode
+        ? "generic Node/package CI uses existing package scripts"
+        : "--skip-install enabled";
+      log(`Would install: nothing (${reason}).`);
     }
     log("");
     log("Run again without --dry-run to apply these changes.");
@@ -274,4 +338,8 @@ export async function runAddCi(opts: Options): Promise<void> {
     }
   }
   log("");
+
+  if (opts.json) {
+    console.log(JSON.stringify({ mode: "apply", plan }, null, 2));
+  }
 }

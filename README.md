@@ -32,6 +32,9 @@ npx @builtbyecho/add-ci . --tier 2
 # Preview without touching the project
 npx @builtbyecho/add-ci . --tier 2 --dry-run
 
+# Machine-readable plan for agents/automation
+npx @builtbyecho/add-ci . --tier 2 --dry-run --json
+
 # Node/CLI/package project: workflow only, no Playwright files or installs
 npx @builtbyecho/add-ci . --framework generic --backend none --tier 3
 ```
@@ -46,6 +49,14 @@ Use `--dry-run` before letting an agent modify a repository. It performs the sam
 
 No directories are created, no files are written, and no dependencies are installed. This makes `add-ci` safer to use inside coding-agent handoffs and CI-planning conversations.
 
+Add `--json` to emit a machine-readable plan instead of human text:
+
+```bash
+npx @builtbyecho/add-ci . --dry-run --json
+```
+
+The JSON includes detected framework/backend/package manager, planned file actions (`create`, `overwrite`, or `skip`), install commands, notes, and next steps. This is the safest mode for agents that need to inspect a repo and decide whether CI scaffolding is appropriate before writing files.
+
 ## Options
 
 | Flag | Default | Description |
@@ -56,6 +67,7 @@ No directories are created, no files are written, and no dependencies are instal
 | `--skip-vercel` | off | Skip Vercel preview integration |
 | `--skip-install` | off | Skip npm/pnpm install step |
 | `--dry-run` | off | Preview detected stack, planned files, and install commands without writing anything |
+| `--json` | off | Print structured plan output for agents and automation |
 | `--force` | off | Overwrite existing workflow/test files |
 
 ## Auto-Detection
